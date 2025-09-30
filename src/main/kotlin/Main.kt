@@ -11,12 +11,21 @@ import io.ktor.server.response.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import io.ktor.http.*
+import io.ktor.server.plugins.statuspages.*
 
 @Serializable
 data class Item(val id: Int, val name: String)
 
 fun main() {
     embeddedServer(Netty, port = 8080) {
+        install(StatusPages){
+            exception<Throwable> { call, cause ->
+                    call.respondText(text = "500: $cause" , status = HttpStatusCode.InternalServerError)
+            }
+            status(HttpStatusCode.NotFound) { call, status ->
+                call.respondText(text = "404: Page Not Found", status = status)
+            }
+        }
         install(ContentNegotiation) {
             json()
         }
@@ -71,8 +80,9 @@ fun main() {
                 if (!removed) {
                     return@delete call.respond(HttpStatusCode.NotFound, mapOf("error" to "Item not found"))
                 }
-                call.respond(HttpStatusCode.OK, mapOf("message" to "Item deleted"))
+                call.respond(HttpStatusCode.NoContent)
             }
+
         }
     }.start(wait = true)
 }
