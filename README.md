@@ -1,4 +1,4 @@
-# Kotlin_kt1
+# Kotlin_kt2
 ## Запуск
 
 1. Склонировать репозиторий
@@ -8,5 +8,6 @@
 ## Маршруты:
 - `GET /items` — получить все элементы
 - `GET /items/{id}` — получить элемент по id (path параметр)
-- `POST /items` — добавить элемент (JSON тело запроса, формат Item - {id: Int, name: String})
-- `DELETE /items?id={id}` — удалить элемент по id (query параметр)
+- `POST /adding_a_password" вести пароль (JSON тело запроса, формат Passwod_html - {passwod: String})
+- `POST /items` — добавить элемент (JSON тело запроса, формат Item - {id: Int, name: String, passwod: String})
+- `DELETE /items?id={id}` — удалить элемент по id (query параметр) (JSON тело запроса, формат Passwod_html - {passwod: String})
