@@ -8,6 +8,6 @@
 ## Маршруты:
 - `GET /items` — получить все элементы
 - `GET /items/{id}` — получить элемент по id (path параметр)
-- `POST /adding_a_password" вести пароль (JSON тело запроса, формат Passwod_html - {passwod: String})
+- `POST /adding_a_password вести пароль (JSON тело запроса, формат Passwod_html - {passwod: String})
 - `POST /items` — добавить элемент (JSON тело запроса, формат Item - {id: Int, name: String, passwod: String})
 - `DELETE /items?id={id}` — удалить элемент по id (query параметр) (JSON тело запроса, формат Passwod_html - {passwod: String})
