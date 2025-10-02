@@ -12,12 +12,76 @@ import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import io.ktor.http.*
 import io.ktor.server.plugins.statuspages.*
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.transactions.transaction
+///
+import org.example.password_bcrypt as Password_bcrypt
 
 @Serializable
-data class Item(val id: Int, val name: String)
+data class Item(val id: Int, val name: String, val passwod: String)
+
+@Serializable
+data class Passwod_html( val passwod: String)
+
+object Products : Table() {
+    val id = integer("id").autoIncrement()
+    val name = varchar("name", 50)
+}
 
 fun main() {
+
+    fun addItem(id: Int, name: String) {
+        transaction {
+            Products.insert {
+                it[this.id] = id
+                it[this.name] = name
+            }
+        }
+    }
+    fun deleteItemById(productId: Int) {
+        transaction {
+            Products.deleteWhere { Products.id eq productId }
+        }
+    }
+    fun infoItem(){
+        transaction {
+            for (product in Products.selectAll()) {
+                println("${product[Products.id]} - ${product[Products.name]}")
+            }
+        }
+    }
+    fun infoItem(id: Int){
+        transaction {
+            val product = Products.select { Products.id eq id }.singleOrNull()
+
+            if (product != null) {
+                val name = product[Products.name]
+                println("$id - $name")
+            } else {
+                println("Product with id=$id not found")
+            }
+        }
+    }
+    fun doesTheItemExist(id: Int): Boolean {
+        val product = Products.select { Products.id eq id }.singleOrNull()
+
+        if (product != null) {
+            return true
+        } else {
+            return false
+        }
+    }
+
     embeddedServer(Netty, port = 8080) {
+
+        Database.connect(
+            url = "jdbc:postgresql://localhost:5432/dbstore",
+            driver = "org.postgresql.Driver",
+            user = "storekeeper",
+            password = "1234561"
+        )
+
         install(StatusPages){
             exception<Throwable> { call, cause ->
                     call.respondText(text = "500: $cause" , status = HttpStatusCode.InternalServerError)
@@ -29,17 +93,13 @@ fun main() {
         install(ContentNegotiation) {
             json()
         }
+
         routing {
-            val items = mutableListOf<Item>(
-                Item(1, "box"),
-                Item(2, "book"),
-                Item(3, "telephone"),
-                Item(4, "bag"),
-                Item(6, "pen"),
-            )
+
+            var passwod_main = Password_bcrypt()
 
             get("/items") {
-                call.respond(items)
+                call.respond(infoItem())
             }
 
             get("/items/{id}") {
@@ -49,7 +109,7 @@ fun main() {
                     return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid id parameter"))
                 }
 
-                val item = items.find { it.id == id }
+                val item = infoItem(id)
                 if (item == null) {
                     return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "Item not found"))
                 }
@@ -62,25 +122,48 @@ fun main() {
                 } catch(e: Exception) {
                     return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid JSON"))
                 }
-                if (items.any { it.id == newItem.id }) {
+                if (passwod_main.isValid(newItem.passwod)) {
 
-                    return@post call.respond(HttpStatusCode.Conflict, mapOf("error" to "Item with this id already exists"))
+                    if (doesTheItemExist(newItem.id) != true) {
+                        return@post call.respond(
+                            HttpStatusCode.Conflict,
+                            mapOf("error" to "Item with this id already exists")
+                        )
+                    }
+                    addItem(newItem.id, newItem.name)
+                    call.respond(HttpStatusCode.Created, newItem)
+
                 }
-                items.add(newItem)
-                call.respond(HttpStatusCode.Created, newItem)
+                return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid JSON"))
+            }
+
+            post("/adding_a_password"){
+                val newUser = try {
+                    call.receive<Passwod_html>()
+                }catch(e: Exception) {
+                    return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid JSON"))
+                }
+                passwod_main.hashPassword(newUser.passwod)
             }
 
             delete("/items") {
-                val idParam = call.request.queryParameters["id"]
-                val id = idParam?.toIntOrNull()
-                if (id == null) {
-                    return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing or invalid id query parameter"))
+                val newUser = try {
+                    call.receive<Passwod_html>()
+                }catch(e: Exception) {
+                    return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid JSON"))
                 }
-                val removed = items.removeIf { it.id == id }
-                if (!removed) {
-                    return@delete call.respond(HttpStatusCode.NotFound, mapOf("error" to "Item not found"))
+                if (passwod_main.isValid(newUser.passwod))
+                {
+                    val idParam = call.request.queryParameters["id"]
+                    val id = idParam?.toIntOrNull()
+                    if (id == null) {
+                        return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing or invalid id query parameter"))
+                    }
+                    deleteItemById(id);
+
+                    call.respond(HttpStatusCode.NoContent)
                 }
-                call.respond(HttpStatusCode.NoContent)
+                return@delete call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid JSON"))
             }
 
         }
